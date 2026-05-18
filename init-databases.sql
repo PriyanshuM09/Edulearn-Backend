@@ -1,0 +1,11 @@
+CREATE DATABASE IF NOT EXISTS edulearn_auth;
+CREATE DATABASE IF NOT EXISTS edulearn_courses;
+CREATE DATABASE IF NOT EXISTS edulearn_lessons;
+CREATE DATABASE IF NOT EXISTS edulearn_enrollment;
+CREATE DATABASE IF NOT EXISTS edulearn_assessment;
+CREATE DATABASE IF NOT EXISTS edulearn_payment;
+CREATE DATABASE IF NOT EXISTS edulearn_progress;
+CREATE DATABASE IF NOT EXISTS edulearn_discussion;
+CREATE DATABASE IF NOT EXISTS edulearn_notification;
+GRANT ALL PRIVILEGES ON *.* TO 'edulearn'@'%';
+FLUSH PRIVILEGES;

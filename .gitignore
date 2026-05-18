@@ -1,0 +1,27 @@
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Build files
+target/
+*.class
+
+# IDE files
+.settings/
+.project
+.classpath
+.factorypath
+.metadata/
+.vscode/
+bin/
+
+# OS files
+Thumbs.db
+.DS_Store
+
+# Database Backups & Temporary SQL Files (keeps production credentials secure)
+*.sql
+!init-databases.sql

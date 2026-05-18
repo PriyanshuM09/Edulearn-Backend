@@ -1,0 +1,406 @@
+version: '3.8'
+
+services:
+  # Infrastructure services
+  mysql:
+    image: mysql:8.0
+    container_name: edulearn-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
+      MYSQL_USER: ${DB_USERNAME}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./init-databases.sql:/docker-entrypoint-initdb.d/init.sql
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - edulearn-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: edulearn-redis
+    ports:
+      - "6379:6379"
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - edulearn-network
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: edulearn-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBIT_USERNAME}
+      RABBITMQ_DEFAULT_PASS: ${RABBIT_PASSWORD}
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - edulearn-network
+
+  # Spring Boot services
+  eureka-server:
+    build:
+      context: .
+      dockerfile: eureka-server/Dockerfile
+    container_name: eureka-server
+    ports:
+      - "8761:8761"
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+    networks:
+      - edulearn-network
+    restart: on-failure
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8761/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  api-gateway:
+    build:
+      context: .
+      dockerfile: api-gateway/Dockerfile
+    container_name: api-gateway
+    ports:
+      - "8080:8080"
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+    networks:
+      - edulearn-network
+    restart: on-failure
+    depends_on:
+      eureka-server:
+        condition: service_healthy
+    environment:
+      EUREKA_URL: http://eureka-server:8761/eureka/
+      JWT_SECRET: ${JWT_SECRET}
+      EUREKA_INSTANCE_PREFER_IP_ADDRESS: "true"
+      EUREKA_INSTANCE_HOSTNAME: ""
+      TZ: Asia/Kolkata
+
+  auth-service:
+    build:
+      context: .
+      dockerfile: auth-service/Dockerfile
+    container_name: auth-service
+    ports:
+      - "8081:8081"
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+    networks:
+      - edulearn-network
+    restart: on-failure
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      eureka-server:
+        condition: service_healthy
+    environment:
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_URL: jdbc:mysql://edulearn-mysql:3306/edulearn_auth?createDatabaseIfNotExist=true&useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+      EUREKA_URL: http://eureka-server:8761/eureka/
+      REDIS_HOST: edulearn-redis
+      JWT_SECRET: ${JWT_SECRET}
+      MAIL_USERNAME: ${MAIL_USERNAME}
+      MAIL_PASSWORD: ${MAIL_PASSWORD}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      EUREKA_INSTANCE_PREFER_IP_ADDRESS: "true"
+      EUREKA_INSTANCE_HOSTNAME: ""
+      TZ: Asia/Kolkata
+
+  course-service:
+    build:
+      context: .
+      dockerfile: course-service/Dockerfile
+    container_name: course-service
+    ports:
+      - "8082:8082"
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+    networks:
+      - edulearn-network
+    restart: on-failure
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      eureka-server:
+        condition: service_healthy
+    environment:
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_URL: jdbc:mysql://edulearn-mysql:3306/edulearn_courses?createDatabaseIfNotExist=true&useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+      EUREKA_URL: http://eureka-server:8761/eureka/
+      REDIS_HOST: edulearn-redis
+      EUREKA_INSTANCE_PREFER_IP_ADDRESS: "true"
+      EUREKA_INSTANCE_HOSTNAME: ""
+      TZ: Asia/Kolkata
+
+  lesson-service:
+    build:
+      context: .
+      dockerfile: lesson-service/Dockerfile
+    container_name: lesson-service
+    ports:
+      - "8083:8083"
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+    networks:
+      - edulearn-network
+    restart: on-failure
+    depends_on:
+      mysql:
+        condition: service_healthy
+      eureka-server:
+        condition: service_healthy
+    environment:
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_URL: jdbc:mysql://edulearn-mysql:3306/edulearn_lessons?createDatabaseIfNotExist=true&useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+      EUREKA_URL: http://eureka-server:8761/eureka/
+      EUREKA_INSTANCE_PREFER_IP_ADDRESS: "true"
+      EUREKA_INSTANCE_HOSTNAME: ""
+      TZ: Asia/Kolkata
+
+  enrollment-service:
+    build:
+      context: .
+      dockerfile: enrollment-service/Dockerfile
+    container_name: enrollment-service
+    ports:
+      - "8084:8084"
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+    networks:
+      - edulearn-network
+    restart: on-failure
+    depends_on:
+      mysql:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      eureka-server:
+        condition: service_healthy
+    environment:
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_URL: jdbc:mysql://edulearn-mysql:3306/edulearn_enrollment?createDatabaseIfNotExist=true&useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+      EUREKA_URL: http://eureka-server:8761/eureka/
+      RABBITMQ_HOST: edulearn-rabbitmq
+      RABBIT_USERNAME: ${RABBIT_USERNAME}
+      RABBIT_PASSWORD: ${RABBIT_PASSWORD}
+      EUREKA_INSTANCE_PREFER_IP_ADDRESS: "true"
+      EUREKA_INSTANCE_HOSTNAME: ""
+      TZ: Asia/Kolkata
+
+  assessment-service:
+    build:
+      context: .
+      dockerfile: assessment-service/Dockerfile
+    container_name: assessment-service
+    ports:
+      - "8085:8085"
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+    networks:
+      - edulearn-network
+    restart: on-failure
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      eureka-server:
+        condition: service_healthy
+    environment:
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_URL: jdbc:mysql://edulearn-mysql:3306/edulearn_assessment?createDatabaseIfNotExist=true&useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+      EUREKA_URL: http://eureka-server:8761/eureka/
+      REDIS_HOST: edulearn-redis
+      EUREKA_INSTANCE_PREFER_IP_ADDRESS: "true"
+      EUREKA_INSTANCE_HOSTNAME: ""
+      TZ: Asia/Kolkata
+
+  payment-service:
+    build:
+      context: .
+      dockerfile: payment-service/Dockerfile
+    container_name: payment-service
+    ports:
+      - "8086:8086"
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+    networks:
+      - edulearn-network
+    restart: on-failure
+    depends_on:
+      mysql:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      eureka-server:
+        condition: service_healthy
+    environment:
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_URL: jdbc:mysql://edulearn-mysql:3306/edulearn_payment?createDatabaseIfNotExist=true&useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+      EUREKA_URL: http://eureka-server:8761/eureka/
+      RABBITMQ_HOST: edulearn-rabbitmq
+      RABBIT_USERNAME: ${RABBIT_USERNAME}
+      RABBIT_PASSWORD: ${RABBIT_PASSWORD}
+      RAZORPAY_KEY_ID: ${RAZORPAY_KEY_ID}
+      RAZORPAY_KEY_SECRET: ${RAZORPAY_KEY_SECRET}
+      EUREKA_INSTANCE_PREFER_IP_ADDRESS: "true"
+      EUREKA_INSTANCE_HOSTNAME: ""
+      TZ: Asia/Kolkata
+
+  progress-service:
+    build:
+      context: .
+      dockerfile: progress-service/Dockerfile
+    container_name: progress-service
+    ports:
+      - "8087:8087"
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+    networks:
+      - edulearn-network
+    restart: on-failure
+    depends_on:
+      mysql:
+        condition: service_healthy
+      eureka-server:
+        condition: service_healthy
+    environment:
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_URL: jdbc:mysql://edulearn-mysql:3306/edulearn_progress?createDatabaseIfNotExist=true&useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+      EUREKA_URL: http://eureka-server:8761/eureka/
+      SERVICES_AUTH_BASE_URL: http://auth-service:8081
+      SERVICES_COURSE_BASE_URL: http://course-service:8082
+      EUREKA_INSTANCE_PREFER_IP_ADDRESS: "true"
+      EUREKA_INSTANCE_HOSTNAME: ""
+      TZ: Asia/Kolkata
+
+  discussion-service:
+    build:
+      context: .
+      dockerfile: discussion-service/Dockerfile
+    container_name: discussion-service
+    ports:
+      - "8088:8088"
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+    networks:
+      - edulearn-network
+    restart: on-failure
+    depends_on:
+      mysql:
+        condition: service_healthy
+      eureka-server:
+        condition: service_healthy
+    environment:
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_URL: jdbc:mysql://edulearn-mysql:3306/edulearn_discussion?createDatabaseIfNotExist=true&useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+      EUREKA_URL: http://eureka-server:8761/eureka/
+      EUREKA_INSTANCE_PREFER_IP_ADDRESS: "true"
+      EUREKA_INSTANCE_HOSTNAME: ""
+      TZ: Asia/Kolkata
+
+  notification-service:
+    build:
+      context: .
+      dockerfile: notification-service/Dockerfile
+    container_name: notification-service
+    ports:
+      - "8089:8089"
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+    networks:
+      - edulearn-network
+    restart: on-failure
+    depends_on:
+      mysql:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      eureka-server:
+        condition: service_healthy
+    environment:
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_URL: jdbc:mysql://edulearn-mysql:3306/edulearn_notification?createDatabaseIfNotExist=true&useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+      EUREKA_URL: http://eureka-server:8761/eureka/
+      RABBITMQ_HOST: edulearn-rabbitmq
+      RABBIT_USERNAME: ${RABBIT_USERNAME}
+      RABBIT_PASSWORD: ${RABBIT_PASSWORD}
+      MAIL_USERNAME: ${MAIL_USERNAME}
+      MAIL_PASSWORD: ${MAIL_PASSWORD}
+      EUREKA_INSTANCE_PREFER_IP_ADDRESS: "true"
+      EUREKA_INSTANCE_HOSTNAME: ""
+      SERVICES_AUTH_BASE_URL: http://auth-service:8081
+      SERVICES_COURSE_BASE_URL: http://course-service:8082
+      TZ: Asia/Kolkata
+
+volumes:
+  mysql-data:
+
+networks:
+  edulearn-network:
+    driver: bridge
