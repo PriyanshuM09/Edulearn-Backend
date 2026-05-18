@@ -122,18 +122,18 @@ pipeline {
             steps {
                 echo '=== DEPLOYING DOCKER CONTAINERS TO AWS EC2 INSTANCE ==='
                 
-                sshagent(credentials: [params.EC2_CREDENTIALS_ID]) {
+                withCredentials([sshUserPrivateKey(credentialsId: params.EC2_CREDENTIALS_ID, keyFileVariable: 'SSH_KEY_FILE', usernameVariable: 'SSH_USER')]) {
                     // 1. Create target directory on EC2
-                    sh "ssh -o StrictHostKeyChecking=no ${params.EC2_USER}@${params.EC2_HOST} 'mkdir -p ~/edulearn-app'"
+                    sh "ssh -i \$SSH_KEY_FILE -o StrictHostKeyChecking=no \$SSH_USER@${params.EC2_HOST} 'mkdir -p ~/edulearn-app'"
 
                     // 2. Transfer docker-compose.prod.yml and database initialization scripts
-                    sh "scp -o StrictHostKeyChecking=no docker-compose.prod.yml ${params.EC2_USER}@${params.EC2_HOST}:~/edulearn-app/docker-compose.yml"
-                    sh "scp -o StrictHostKeyChecking=no init-databases.sql ${params.EC2_USER}@${params.EC2_HOST}:~/edulearn-app/"
+                    sh "scp -i \$SSH_KEY_FILE -o StrictHostKeyChecking=no docker-compose.prod.yml \$SSH_USER@${params.EC2_HOST}:~/edulearn-app/docker-compose.yml"
+                    sh "scp -i \$SSH_KEY_FILE -o StrictHostKeyChecking=no init-databases.sql \$SSH_USER@${params.EC2_HOST}:~/edulearn-app/"
 
                     // 3. Create or update .env file securely on the EC2 host
                     // This safely updates DOCKER_REGISTRY_USER and IMAGE_TAG without wiping out other production secrets
                     sh """
-                    ssh -o StrictHostKeyChecking=no ${params.EC2_USER}@${params.EC2_HOST} '
+                    ssh -i \$SSH_KEY_FILE -o StrictHostKeyChecking=no \$SSH_USER@${params.EC2_HOST} '
                         cd ~/edulearn-app
                         touch .env
                         sed -i "/^DOCKER_REGISTRY_USER=/d" .env
@@ -145,11 +145,8 @@ pipeline {
 
                     // 4. Run Docker Compose pull & up on remote server
                     sh """
-                    ssh -o StrictHostKeyChecking=no ${params.EC2_USER}@${params.EC2_HOST} '
+                    ssh -i \$SSH_KEY_FILE -o StrictHostKeyChecking=no \$SSH_USER@${params.EC2_HOST} '
                         cd ~/edulearn-app
-                        
-                        # Login to Docker Hub inside EC2 instance to pull private images (optional/fallback)
-                        # docker login -u ${env.REGISTRY} ...
                         
                         # Stop and clean up old services
                         docker compose down --remove-orphans
