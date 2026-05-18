@@ -1,13 +1,6 @@
-FROM maven:3.8.4-openjdk-17-slim AS builder
-WORKDIR /app
-COPY pom.xml .
-COPY lesson-service/pom.xml lesson-service/
-COPY lesson-service/src lesson-service/src
-RUN mvn -f lesson-service/pom.xml package -DskipTests
-
 FROM eclipse-temurin:17-jre-alpine
 WORKDIR /app
-COPY --from=builder /app/lesson-service/target/lesson-service-0.0.1-SNAPSHOT.jar app.jar
+COPY lesson-service/target/lesson-service-0.0.1-SNAPSHOT.jar app.jar
 EXPOSE 8083
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
   CMD wget --quiet --tries=1 --spider http://localhost:8083/actuator/health || exit 1
