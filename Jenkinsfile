@@ -4,7 +4,7 @@ pipeline {
     parameters {
         string(name: 'DOCKER_REGISTRY_USER', defaultValue: 'priyanshu436', description: 'Docker Hub Username / Registry Namespace')
         string(name: 'DOCKER_CREDENTIALS_ID', defaultValue: 'docker-hub-credentials', description: 'Jenkins Credentials ID for Docker Registry')
-        string(name: 'EC2_HOST', defaultValue: 'ec2-3-108-54-12.ap-south-1.compute.amazonaws.com', description: 'AWS EC2 Host public DNS or IP address')
+        string(name: 'EC2_HOST', defaultValue: 'ec2-16-170-205-58.eu-north-1.compute.amazonaws.com', description: 'AWS EC2 Host public DNS or IP address')
         string(name: 'EC2_USER', defaultValue: 'ubuntu', description: 'SSH User for the EC2 Instance (ubuntu / ec2-user)')
         string(name: 'EC2_CREDENTIALS_ID', defaultValue: 'aws-ec2-ssh-key', description: 'Jenkins Credentials ID containing the SSH Private Key (.pem) for EC2')
         booleanParam(name: 'RUN_SONAR_ANALYSIS', defaultValue: false, description: 'Run SonarQube Code Quality Analysis')
