@@ -1,6 +1,22 @@
+# Stage 1: Build the Maven project
+FROM maven:3.9.6-eclipse-temurin-17-alpine AS build
+WORKDIR /app
+
+# Copy parent POM
+COPY pom.xml .
+
+# Copy the service code
+COPY notification-service/pom.xml notification-service/
+COPY notification-service/src notification-service/src
+
+# Build the service
+WORKDIR /app/notification-service
+RUN mvn clean package -DskipTests
+
+# Stage 2: Runtime image
 FROM eclipse-temurin:17-jre-alpine
 WORKDIR /app
-COPY notification-service/target/notification-service-0.0.1-SNAPSHOT.jar app.jar
+COPY --from=build /app/notification-service/target/notification-service-0.0.1-SNAPSHOT.jar app.jar
 EXPOSE 8089
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
   CMD wget --quiet --tries=1 --spider http://localhost:8089/actuator/health || exit 1
