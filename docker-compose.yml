@@ -106,6 +106,7 @@ services:
     environment:
       EUREKA_URL: http://eureka-server:8761/eureka/
       JWT_SECRET: ${JWT_SECRET}
+      ALLOWED_CORS_ORIGIN: https://edulearn-frontend-mocha.vercel.app
       EUREKA_INSTANCE_PREFER_IP_ADDRESS: "true"
       EUREKA_INSTANCE_HOSTNAME: ""
       TZ: Asia/Kolkata
