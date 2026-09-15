@@ -124,7 +124,7 @@ public class AuthServiceImpl implements AuthService {
         user.setProvider(PROVIDER_LOCAL);
         
         // New users need email verification
-        user.setEmailVerified(false);
+        user.setEmailVerified(true); // Temporarily bypassed
         user.setVerificationCode(generateOtp());
 
         // Instructors require admin approval
@@ -164,9 +164,9 @@ public class AuthServiceImpl implements AuthService {
                     "Instructor account pending admin approval. Please wait for verification.");
         }
 
-        if (!user.isEmailVerified()) {
-            throw new RuntimeException("Email not verified. Please verify your email via OTP.");
-        }
+        // if (!user.isEmailVerified()) {
+        //     throw new RuntimeException("Email not verified. Please verify your email via OTP.");
+        // }
 
         String token = generateToken(user);
 
