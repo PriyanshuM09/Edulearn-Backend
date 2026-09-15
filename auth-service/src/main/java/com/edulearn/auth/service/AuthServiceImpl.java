@@ -226,6 +226,13 @@ public class AuthServiceImpl implements AuthService {
                 return userRepository.save(newUser);
             });
 
+            // Automatically verify the email if they authenticate via Google, 
+            // since Google has already verified their identity.
+            if (!user.isEmailVerified()) {
+                user.setEmailVerified(true);
+                userRepository.save(user);
+            }
+
             if (ROLE_SUSPENDED.equals(user.getRole())) {
                 throw new RuntimeException("Account suspended. Please contact admin.");
             }
